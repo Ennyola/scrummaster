@@ -2,7 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import  { DataService } from '../data.service';
 
 import { DragulaService } from 'ng2-dragula';
-import { Subscription } from 'rxJs';
+import { Subscription } from 'rxjs';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 @Component({
   selector: 'app-profile',
@@ -15,7 +16,7 @@ export class ProfileComponent implements OnInit {
 	subs = new Subscription();
 
 
-  constructor(private dataservice: DataService, private dragula: DragulaService) {
+  constructor(private dataservice: DataService, private dragula: DragulaService, private http: HttpClient) {
   	this.dragula.createGroup('mainTable', {
   		revertOnSpill:true,
   		direction: 'horizontal',
@@ -62,8 +63,68 @@ export class ProfileComponent implements OnInit {
 
   	);
 
+
+    this.dataservice.username = sessionStorage.getItem('username');
+    this.dataservice.role = sessionStorage.getItem('role');
+    this.dataservice.authOptions = {
+        headers: new HttpHeaders ({'content-Type' : 'application/json', 'Authorization' : 'JWT ' + sessionStorage.getItem('token')})
+          };
+    
+    this.http.get('http://127.0.0.1:8000/medunoyeeniscrum/api/scrumusers/',this.dataservice.httpOptions).subscribe(
+
+        data => {
+        console.log(data);
+         for(var i = 0; i < data['length']; i++)
+         {
+            data[i]['scrumgoal_set'] = data[i]['scrumgoal_set'].filter(s =>['visible']);
+         }
+         this.dataservice.users = data;
+
+        },
+        err =>{
+            this.dataservice.message = 'Unexpected Error!';
+            console.log(err);      
+        }
+    );      
    }
 
+   editGoal(event)
+   {
+
+      console.log(event)
+      var items = event.target.innerText.split(/\)\s(.+)/);
+      var goal_name = window.prompt('Editing Task ID #' + items[0] + ':', items[1]);
+      if(goal_name == null || goal_name == '')
+      {
+          this.dataservice.message = 'Edit Canceled.';
+      } else
+      {
+         this.http.put('http://127.0.0.1:8000/medunoyeeniscrum/api/scrumgoals/', JSON.stringify({'mode': 1,'goal_id' : items[0], 'new_name': goal_name}),this.dataservice.authOptions).subscribe(
+        data => {
+          this.dataservice.users = data['data'];
+          this.dataservice.message = data['message'];
+          
+        },
+        err => {
+             console.error(err);
+             if(err['status'] == 401)
+            {
+                this.dataservice.message = 'Session invalid or Expired. Please Login'
+                this.dataservice.logout();
+            }else
+            {
+                this.dataservice.message = 'Unexpected Error!'
+            }
+        }
+    );
+      }
+   }
+
+   doNothing()
+   {
+
+
+   }
   ngOnInit() {
   }
 

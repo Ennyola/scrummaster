@@ -122,8 +122,8 @@ def move_goal(request,goal_id,to_id):
 			from_allowed = [1,2]
 			to_allowed = [1,2]
 		elif group == 'Developer':
-			from_allowed = [0,1]
-			to_allowed = [0,1]
+			from_allowed = [0,1,2]
+			to_allowed = [0,1,2]
 		elif group == 'Quality Analyst':
 			from_allowed = [2,3]
 			to_allowed = [2,3]
@@ -220,8 +220,8 @@ class ScrumGoalViewSet(viewsets.ModelViewSet):
 				from_allowed = [1,2]
 				to_allowed = [1,2]
 			elif group == 'Developer':
-				from_allowed = [0,1]
-				to_allowed = [0,1]
+				from_allowed = [0,1,2]
+				to_allowed = [0,1,2]
 			elif group == 'Quality Analyst':
 				from_allowed = [2,3]
 				to_allowed = [2,3]
@@ -237,25 +237,37 @@ class ScrumGoalViewSet(viewsets.ModelViewSet):
 
 		
 	def put(self,request):
-		from_id = request.data['from_id']
-		to_id = request.data['to_id']
+		if request.data['mode'] == 0:
+			from_id = request.data['from_id']
+			to_id = request.data['to_id']
 
-		if request.user.groups.all()[0].name == 'Developer' or request.user.groups.all()[0].name == 'Quality Analyst':
-			return JsonResponse({'message': 'Permission Denied : Unauthorized Reassignment of Goals', 'data' : filtered_users()})
-		goal = ScrumGoal.objects.get(id = from_id)
-		author = ScrumGoal.objects.get(id = to_id).user
-		goal.user = author
-		goal.save()
-		return JsonResponse({'message': 'Reassigned Successfully!', 'data' : filtered_users()})
-	
+			if request.user.groups.all()[0].name == 'Developer' or request.user.groups.all()[0].name == 'Quality Analyst':
+				return JsonResponse({'message': 'Permission Denied : Unauthorized Reassignment of Goals', 'data' : filtered_users()})
+
+			goal = ScrumGoal.objects.get(id = from_id)
+
+			author = None
+			if to_id[0] == 'u':
+				author = ScrumUser.objects.get(id=to_id[1:])
+			else:
+				author = ScrumGoal.objects.get(id = to_id).user
+			goal.user = author
+			goal.save()
+			return JsonResponse({'message': 'Goal Reassigned Successfully!', 'data' : filtered_users()})
+		else:
+			goal = ScrumGoal.objects.get(id = request.data['goal_id'])
+			if request.user.groups.all()[0].name != 'Owner' and request.user != goal.user.user:
+				return JsonResponse({'message': 'Permission Denied : Unauthorized Name Change of Goal', 'data' : filtered_users()})	
+			
+			goal.name = request.data['new_name']
+			goal.save()
+			return JsonResponse({'message': 'Goal Name Changed!', 'data' : filtered_users()})
 
 
 def jwt_response_payload_handler(token, user=None, request=None):
     return {
         'token': token,
-        'message': 'Welcome!',
-        'role': user.groups.all()[0].name,
-        'data':filtered_users()
+        'role': user.groups.all()[0].name
 
 
        }
